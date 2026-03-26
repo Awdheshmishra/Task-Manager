@@ -1,105 +1,126 @@
-// Get DOM elements
 const taskInput = document.getElementById('taskInput');
 const addBtn = document.getElementById('addBtn');
 const taskList = document.getElementById('taskList');
 const tasksLeftSpan = document.getElementById('tasksLeft');
 const filterBtns = document.querySelectorAll('.filter-btn');
 
-// Tasks array
 let tasks = [];
+let currentFilter = 'all';
 
-// Add task function
+// ADD TASK
 function addTask() {
     const text = taskInput.value.trim();
-    
-    if (text === '') {
-        alert('Please enter a task!');
-        return;
-    }
+    if (!text) return;
+
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${today.getMonth()+1}-${today.getDate()}`;
 
     const newTask = {
         id: Date.now(),
-        text: text,
-        completed: false
+        text,
+        completed: false,
+        date: dateStr
     };
 
     tasks.push(newTask);
     taskInput.value = '';
+    save();
     renderTasks();
-    saveToLocalStorage();
 }
 
-// Delete task
+// DELETE
 function deleteTask(id) {
-    tasks = tasks.filter(task => task.id !== id);
+    tasks = tasks.filter(t => t.id !== id);
+    save();
     renderTasks();
-    saveToLocalStorage();
 }
 
-// Toggle task completion
+// TOGGLE
 function toggleTask(id) {
-    const task = tasks.find(task => task.id === id);
-    if (task) {
-        task.completed = !task.completed;
-        renderTasks();
-        saveToLocalStorage();
-    }
+    const t = tasks.find(x => x.id === id);
+    t.completed = !t.completed;
+    save();
+    renderTasks();
 }
 
-// Render tasks
-function renderTasks(filter = 'all') {
+// RENDER
+function renderTasks(filter = currentFilter) {
+    currentFilter = filter;
     taskList.innerHTML = '';
 
-    let filteredTasks = tasks;
-    if (filter === 'active') {
-        filteredTasks = tasks.filter(task => !task.completed);
-    } else if (filter === 'completed') {
-        filteredTasks = tasks.filter(task => task.completed);
+    let filtered = tasks;
+
+    if (filter === 'active') filtered = tasks.filter(t => !t.completed);
+    if (filter === 'completed') filtered = tasks.filter(t => t.completed);
+
+    tasksLeftSpan.textContent = tasks.filter(t => !t.completed).length;
+
+    if (filtered.length === 0) {
+        taskList.innerHTML = `<p style="color:#aaa;text-align:center">No tasks 😴</p>`;
     }
 
-    // Update counter
-    const activeTasks = tasks.filter(task => !task.completed).length;
-    tasksLeftSpan.textContent = activeTasks;
-
-    // Create task elements
-    filteredTasks.forEach(task => {
+    filtered.forEach(task => {
         const li = document.createElement('li');
-        li.className = 'task-item' + (task.completed ? ' completed' : '');
-        li.dataset.id = task.id;
+        li.className = 'task-item ' + (task.completed ? 'completed' : '');
 
         li.innerHTML = `
-            <span>${task.text}</span>
-            <button class="delete-btn">Delete</button>
+            <div class="task-left">
+                <input type="checkbox" ${task.completed ? 'checked' : ''}>
+                <span>${task.text}</span>
+            </div>
+            <button class="delete-btn">X</button>
         `;
 
-        // Click on task to toggle
-        li.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-btn')) {
-                deleteTask(task.id);
-            } else {
-                toggleTask(task.id);
-            }
-        });
+        li.querySelector('input').addEventListener('change', () => toggleTask(task.id));
+        li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(task.id));
 
         taskList.appendChild(li);
     });
+
+    generateCalendar();
 }
 
-// Save to localStorage
-function saveToLocalStorage() {
+// SAVE
+function save() {
     localStorage.setItem('tasks', JSON.stringify(tasks));
 }
 
-// Load from localStorage
-function loadFromLocalStorage() {
-    const stored = localStorage.getItem('tasks');
-    if (stored) {
-        tasks = JSON.parse(stored);
-        renderTasks();
+// LOAD
+function load() {
+    const data = localStorage.getItem('tasks');
+    if (data) tasks = JSON.parse(data);
+    renderTasks();
+}
+
+// CALENDAR
+function generateCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    const days = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 1; i <= days; i++) {
+        const div = document.createElement('div');
+        div.classList.add('day');
+        div.textContent = i;
+
+        const dateStr = `${year}-${month+1}-${i}`;
+        const dayTasks = tasks.filter(t => t.date === dateStr);
+
+        if (dayTasks.length > 0) {
+            const done = dayTasks.every(t => t.completed);
+            div.classList.add(done ? 'completed' : 'pending');
+        }
+
+        grid.appendChild(div);
     }
 }
 
-// Filter buttons
+// FILTER
 filterBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         filterBtns.forEach(b => b.classList.remove('active'));
@@ -108,14 +129,9 @@ filterBtns.forEach(btn => {
     });
 });
 
-// Event listeners
+// EVENTS
 addBtn.addEventListener('click', addTask);
+taskInput.addEventListener('keypress', e => e.key === 'Enter' && addTask());
 
-taskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        addTask();
-    }
-});
-
-// Initialize
-loadFromLocalStorage();
+// INIT
+load();
